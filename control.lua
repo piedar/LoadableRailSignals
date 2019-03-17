@@ -31,13 +31,15 @@ local function onTrainChangedState(event)
   end
 end
 
-local function resetAll()
+local function tryMoveTrains()
   for key, train in pairs(global.StoppedTrains) do
     local oldState = train.state
-    train.manual_mode = false
-    if train.state == defines.train_state.arrive_signal then
-      train.manual_mode = true -- still waiting
-    else
+
+    train.manual_mode = false -- go!
+    train.manual_mode = train.state == defines.train_state.arrive_signal
+                     or train.state == defines.train_state.wait_signal
+
+    if not train.manual_mode then
       table.remove(global.StoppedTrains, key)
       debug({ "reset train to automatic",
         trainId = train.id,
@@ -50,4 +52,4 @@ end
 
 script.on_init(onInit)
 script.on_event(defines.events.on_train_changed_state, onTrainChangedState)
-script.on_nth_tick(30, resetAll)
+script.on_nth_tick(30, tryMoveTrains)
