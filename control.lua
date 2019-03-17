@@ -1,14 +1,14 @@
 require("lib.debug")
 
 -- how does it work?
--- automated trains are only loadable when stopped at a station
+-- automatic trains are only loadable when stopped at a station
 -- manual trains are loadable whenever they're not moving
--- when a train stops at a signal, switch it to manual mode
--- every few ticks, switch it back to automatic mode to check for a path forward
+-- when a train stops at a signal, set it to manual
+-- every few ticks, set it back to automatic to check for a path forward
 
 -- todo
--- find a way to check wait signal in manual mode, to cut down on global state changes
 -- make the behavior configurable or have its own special entity
+
 
 local function describeTrainState(state)
   local states = { }
@@ -26,7 +26,7 @@ local function describeTrainState(state)
 end
 
 local function onInit(event)
-  global.ModifiedTrains = global.ModifiedTrains or { }
+  global.StoppedTrains = global.StoppedTrains or { }
 end
 
 local function onTrainChangedState(event)
@@ -36,7 +36,7 @@ local function onTrainChangedState(event)
     and not train.manual_mode
   then
     train.manual_mode = true
-    table.insert(global.ModifiedTrains, train)
+    table.insert(global.StoppedTrains, train)
     debug({ "set train to manual",
       trainId = train.id,
       oldState = describeTrainState(event.old_state),
@@ -46,18 +46,22 @@ local function onTrainChangedState(event)
 end
 
 local function resetAll()
-  for key, train in pairs(global.ModifiedTrains) do
+  for key, train in pairs(global.StoppedTrains) do
     local oldState = train.state
-    table.remove(global.ModifiedTrains, key)
     train.manual_mode = false
-    debug({ "reset train to automatic",
-      trainId = train.id,
-      oldState = describeTrainState(oldState),
-      newState = describeTrainState(train.state),
-    })
+    if train.state == defines.train_state.arrive_signal then
+      train.manual_mode = true -- still waiting
+    else
+      table.remove(global.StoppedTrains, key)
+      debug({ "reset train to automatic",
+        trainId = train.id,
+        oldState = describeTrainState(oldState),
+        newState = describeTrainState(train.state),
+      })
+    end
   end
 end
 
 script.on_init(onInit)
 script.on_event(defines.events.on_train_changed_state, onTrainChangedState)
-script.on_nth_tick(60, resetAll)
+script.on_nth_tick(30, resetAll)
