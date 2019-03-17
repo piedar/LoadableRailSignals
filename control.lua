@@ -10,6 +10,21 @@ require("lib.debug")
 -- find a way to check wait signal in manual mode, to cut down on global state changes
 -- make the behavior configurable or have its own special entity
 
+local function describeTrainState(state)
+  local states = { }
+  states[defines.train_state.on_the_path] = "on_the_path"
+  states[defines.train_state.path_lost] = "path_lost"
+  states[defines.train_state.no_schedule] = "no_schedule"
+  states[defines.train_state.no_path] = "no_path"
+  states[defines.train_state.arrive_signal] = "arrive_signal"
+  states[defines.train_state.wait_signal] = "wait_signal"
+  states[defines.train_state.arrive_station] = "arrive_station"
+  states[defines.train_state.wait_station] = "wait_station"
+  states[defines.train_state.manual_control_stop] = "manual_control_stop"
+  states[defines.train_state.manual_control] = "manual_control"
+  return states[state] or "unknown: " .. tostring(state)
+end
+
 local function onInit(event)
   global.ModifiedTrains = global.ModifiedTrains or { }
 end
@@ -20,17 +35,26 @@ local function onTrainChangedState(event)
     and train.state == defines.train_state.wait_signal
     and not train.manual_mode
   then
-    debug({ "setting train to manual", id = train.id })
     train.manual_mode = true
     table.insert(global.ModifiedTrains, train)
+    debug({ "set train to manual",
+      trainId = train.id,
+      oldState = describeTrainState(event.old_state),
+      newState = describeTrainState(train.state),
+    })
   end
 end
 
 local function resetAll()
   for key, train in pairs(global.ModifiedTrains) do
-    debug({ "resetting train to automatic", id = train.id })
+    local oldState = train.state
     table.remove(global.ModifiedTrains, key)
     train.manual_mode = false
+    debug({ "reset train to automatic",
+      trainId = train.id,
+      oldState = describeTrainState(oldState),
+      newState = describeTrainState(train.state),
+    })
   end
 end
 
